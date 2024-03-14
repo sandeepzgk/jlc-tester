@@ -130,24 +130,32 @@ def update_model_property_in_footprint(lib_dir, part_number):
         print(f"No model property found to update in {kicad_mod_filename}.")         
 
 # Process generated files
-def process_generated_files(component_dir, lib_dir, part_number):
+def process_generated_files(component_dir, lib_dir, part_number, replaced_part_number):
     for dirpath, dirnames, filenames in os.walk(component_dir):
         for filename in filenames:
-            dest_dir = os.path.join(lib_dir, part_number)
+            file_path = os.path.join(dirpath, filename)
+            dest_dir = os.path.join(lib_dir, replaced_part_number)
+            new_filename = filename  # Default to the original filename           
             if filename.endswith('.step'):
-                new_filename = f"model.step"
+                new_filename = "model.step"
             elif filename.endswith('.kicad_mod'):
-                dest_dir = os.path.join(lib_dir, part_number, part_number+".pretty")
-                new_filename = f"footprint.kicad_mod"
+                dest_dir = os.path.join(lib_dir, replaced_part_number, replaced_part_number+".pretty")
+                new_filename = "footprint.kicad_mod"
             elif filename.endswith('.kicad_sym'):
-                new_filename = f"symbol.kicad_sym"
-            else:
-                # Skip files that do not match the expected extensions
-                continue
-            # Common operations for all file types
-            os.makedirs(dest_dir, exist_ok=True)
-            shutil.move(os.path.join(dirpath, filename), os.path.join(dest_dir, new_filename))
-            logging.info(f"Moved {filename} from {dirpath} to {dest_dir}")
+                new_filename = "symbol.kicad_sym"
+            else:                
+                continue   # Skip files that do not match the expected extensions            
+            os.makedirs(dest_dir, exist_ok=True)   # Make sure the destination directory exists
+            if not filename.endswith('.step'):                
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
+                    content = file.read()
+                # Replace part_number with replaced_part_number in the content, if present
+                updated_content = content.replace(part_number, replaced_part_number)                
+                with open(os.path.join(dest_dir, new_filename), 'w', encoding='utf-8') as new_file:
+                    new_file.write(updated_content)
+            else:                
+                shutil.move(file_path, os.path.join(dest_dir, new_filename))
+            logging.info(f"Processed {filename} from {dirpath} to {os.path.join(dest_dir, new_filename)}")
 
 # Update kicad_lib_table
 def update_kicad_lib_table(lib_table, lib_dir, processed_part_numbers, lib_type):
@@ -220,14 +228,14 @@ def main():
             logging.warning(f"Manufacturer part number not found for {lcsc_part}. Skipping.")
             continue
         part_number = f"{mfr_part}"
-        part_number = part_number.replace(":", "-") #in some MFG part numbers there are ":" which is not allowed in file names and also causes issues in the linking of pretty files, so replacing them
-        processed_part_numbers.append(part_number)
+        replaced_part_number = part_number.replace(":", "-") #in some MFG part numbers there are ":" which is not allowed in file names and also causes issues in the linking of pretty files, so replacing them
+        processed_part_numbers.append(replaced_part_number)
         ## 3. Update the HEADER section of the model step file so that it reflects the changes we have made so far (optional)
-        process_generated_files(component_dir, args.lib_dir, mfr_part)
-        update_model_property_in_footprint(args.lib_dir, part_number)
-        update_footprint_property_in_symbol(args.lib_dir, part_number)
-        update_kicad_lib_table(args.fp_lib_table, args.lib_dir, part_number, 'fp')
-        update_kicad_lib_table(args.sym_lib_table, args.lib_dir, part_number, 'sym')
+        process_generated_files(component_dir, args.lib_dir, part_number, replaced_part_number)
+        update_model_property_in_footprint(args.lib_dir, replaced_part_number)
+        update_footprint_property_in_symbol(args.lib_dir, replaced_part_number)
+        update_kicad_lib_table(args.fp_lib_table, args.lib_dir, [replaced_part_number], 'fp')
+        update_kicad_lib_table(args.sym_lib_table, args.lib_dir, [replaced_part_number], 'sym')
     remove_temp_and_pycache(args.temp_dir)
     print("KiCad library generation completed successfully.")
 
