@@ -3,7 +3,6 @@ import subprocess
 import shutil
 import argparse
 import re
-
 import logging
 
 # Create necessary directories
@@ -13,11 +12,9 @@ def create_directories(lib_dir, temp_dir):
     os.makedirs(temp_dir, exist_ok=True)
     logging.info(f"Created directory: {temp_dir}")
 
-
 # Set up logging
 def setup_logging():
-    logging.basicConfig(filename='jlc2kicad.log', level=logging.INFO,
-                        format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(filename='jlc2kicad.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
     formatter = logging.Formatter('%(levelname)s: %(message)s')
@@ -28,7 +25,7 @@ def setup_logging():
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Generate KiCad library files from JLCPCB parts.')
     parser.add_argument('--lcsc_part_numbers', metavar='part_number', type=str, nargs='+',
-                    help='LCSC part numbers to process', default=['C2904912', 'C2939725'])
+                        help='LCSC part numbers to process', default=['C2904912', 'C2939725'])
     parser.add_argument('--lib_dir', type=str, default='lib',
                         help='base directory for library files (default: lib)')
     parser.add_argument('--temp_dir', type=str, default='temp',
@@ -42,34 +39,25 @@ def parse_arguments():
 # Validate LCSC part numbers
 def validate_part_numbers(part_numbers):
     pattern = r'^C\d{1,8}$'
-    
     # Ensure part_numbers is always a list
     if isinstance(part_numbers, str):
         part_numbers = [part_numbers]
-    
     trimmed_part_numbers = [part.strip() for part in part_numbers]
     valid_part_numbers = [part for part in trimmed_part_numbers if re.match(pattern, part)]
     invalid_part_numbers = set(trimmed_part_numbers) - set(valid_part_numbers)
-    
     for part in invalid_part_numbers:
-        logging.warning(f"Invalid LCSC part number: {part}. Skipping.")
-    
+        logging.warning(f"Invalid LCSC part number: {part}. Skipping.")    
     return valid_part_numbers
-
 
 # Run JLC2KiCadLib tool
 def run_jlc2kicadlib(lcsc_part, component_dir):
     try:
-        subprocess.run(['JLC2KiCadLib', lcsc_part,
-                        '-dir', component_dir],
-                       check=True)
+        subprocess.run(['JLC2KiCadLib', lcsc_part, '-dir', component_dir],check=True)
         logging.info(f"Executed JLC2KiCadLib tool for {lcsc_part}")
     except subprocess.CalledProcessError as e:
         logging.error(f"Error running JLC2KiCadLib tool for {lcsc_part}: {str(e)}")
         return False
     return True
-
-
 
 # Extract manufacturer part number from the "Value" property in the .kicad_sym file
 def extract_mfr_part_number(component_dir):
@@ -105,86 +93,51 @@ def process_generated_files(component_dir, lib_dir, part_number):
             else:
                 # Skip files that do not match the expected extensions
                 continue
-
             # Common operations for all file types
             dest_dir = os.path.join(lib_dir, part_number)
             os.makedirs(dest_dir, exist_ok=True)
             shutil.move(os.path.join(dirpath, filename), os.path.join(dest_dir, new_filename))
             logging.info(f"Moved {filename} from {dirpath} to {dest_dir}")
 
-# Update fp-lib-table
-def update_fp_lib_table(fp_lib_table, lib_dir, processed_part_numbers):
+# Update kicad_lib_table
+def update_kicad_lib_table(lib_table, lib_dir, processed_part_numbers, lib_type):
+    assert lib_type in ['sym', 'fp'], "lib_type must be either 'sym' for symbols or 'fp' for footprints"
+    
     existing_parts = set()
+    file_exists = os.path.isfile(lib_table)
     file_contents = []
-    file_exists = True
-
-    # Try to read the existing file
-    try:
-        with open(fp_lib_table, 'r') as f:
-            file_contents = f.readlines()
-    except FileNotFoundError:
-        logging.warning(f"{fp_lib_table} not found, will create a new one.")
-        file_exists = False
-        file_contents = ["(fp_lib_table\n", "  (version 7)\n"]
-
-    # Extract existing part names and remove the closing parenthesis if present
-    if file_exists:
-        if file_contents[-1].strip() == ")":
-            file_contents = file_contents[:-1]  # Remove the last line if it is just a closing parenthesis
-        for line in file_contents:
-            if "(lib (name" in line:
-                part_name = line.split("\"")[1]
-                existing_parts.add(part_name)
-
-    # Add new parts
-    new_entries = []
-    for part_number in processed_part_numbers:
-        if part_number not in existing_parts:
-            new_entry = f'  (lib (name "{part_number}")(type "KiCad")(uri "${{KIPRJMOD}}/lib/{part_number}/footprint.kicad_mod")(options "")(descr ""))\n'
-            new_entries.append(new_entry)
-
-    # Update file contents if there are new entries
-    if new_entries:
-        file_contents.extend(new_entries)
-        file_contents.append(")\n")  # Ensure the structure is correctly closed
-
-        # Write the updated contents back to the file
-        with open(fp_lib_table, 'w') as f:
-            f.writelines(file_contents)
-
-        logging.info(f"Updated {fp_lib_table} with new entries.")
-
-# Update sym-lib-table
-def update_sym_lib_table(sym_lib_table, lib_dir, processed_part_numbers):
-    existing_parts = set()
-    file_exists = os.path.isfile(sym_lib_table)
-    file_is_empty = True if not file_exists or os.stat(sym_lib_table).st_size == 0 else False
-
-    # Attempt to read existing parts if file exists
+    entry_template = {
+        'sym': '  (lib (name "{0}")(type "KiCad")(uri "${{KIPRJMOD}}/{1}/{2}/symbol.kicad_sym")(options "")(descr ""))\n',  #format(part_number, lib_dir ,part_number)
+        'fp': '  (lib (name "{0}")(type "KiCad")(uri "${{KIPRJMOD}}/{1}/{2}/footprint.kicad_mod")(options "")(descr ""))\n' #format(part_number, lib_dir ,part_number)
+    }
+    # Read the existing file or initialize it
     if file_exists:
         try:
-            with open(sym_lib_table, 'r') as f:
-                content = f.readlines()
-                for line in content:
-                    if line.strip().startswith("(lib (name"):
-                        part_name = line.split("\"")[1]
-                        existing_parts.add(part_name)
+            with open(lib_table, 'r') as f:
+                file_contents = f.readlines()
         except FileNotFoundError:
-            logging.warning(f"{sym_lib_table} not found, will create a new one.")
-
-    # Prepare to append new entries or create the file with the correct structure
-    with open(sym_lib_table, 'a') as f:
-        if file_is_empty:
-            f.write("(sym_lib_table\n  (version 7)\n")
-
-        for part_number in processed_part_numbers:
-            if part_number not in existing_parts:
-                f.write(f'  (lib (name "{part_number}")(type "KiCad")(uri "${{KIPRJMOD}}/lib/{part_number}/symbol.kicad_sym")(options "")(descr ""))\n')
-
-        if file_is_empty:
-            f.write(")\n")
-
-    logging.info(f"Updated {sym_lib_table} with new entries only.")
+            logging.warning(f"{lib_table} not found, will create a new one.")
+    else:
+        file_contents = [f"({lib_type}_lib_table\n", "  (version 7)\n"]
+        logging.warning(f"{lib_table} not found, will create a new one.")
+    # Extract existing part names and prepare file structure
+    if file_contents and file_contents[-1].strip() == ")":
+        file_contents.pop()  # Remove the closing parenthesis to append new entries later
+    for line in file_contents:
+        if "(lib (name" in line:
+            part_name = line.split("\"")[1]
+            existing_parts.add(part_name)
+    # Add new entries if they do not exist
+    for part_number in processed_part_numbers:
+        if part_number not in existing_parts:
+            new_entry = entry_template[lib_type].format(part_number, lib_dir ,part_number)
+            file_contents.append(new_entry)
+    # Ensure the structure is correctly closed and write back to the file
+    if file_contents[-1].strip() != ")":
+        file_contents.append(")\n")
+    with open(lib_table, 'w' if file_exists else 'a') as f:
+        f.writelines(file_contents)
+    logging.info(f"Updated {lib_table} with new entries for {lib_type} library.")
 
 
 # Remove temp and __pycache__ directories
@@ -197,3 +150,36 @@ def remove_temp_and_pycache(temp_dir):
             logging.warning(f"Directory {directory} not found, nothing to remove.")
         except Exception as e:
             logging.error(f"Error removing directory {directory}: {str(e)}")
+
+
+# Main function
+def main():
+    setup_logging()
+    args = parse_arguments()
+    valid_part_numbers = validate_part_numbers(args.lcsc_part_numbers)
+    create_directories(args.lib_dir, args.temp_dir)
+    processed_part_numbers = []
+    for part_number in valid_part_numbers:
+        logging.info(f"Processing LCSC part number: {part_number}")
+        lcsc_part = part_number
+        component_dir = os.path.join(args.temp_dir, part_number)
+        os.makedirs(component_dir, exist_ok=True)
+        if not run_jlc2kicadlib(lcsc_part, component_dir):
+            continue
+        mfr_part = extract_mfr_part_number(component_dir+'/symbol')
+        if mfr_part is None:
+            logging.warning(f"Manufacturer part number not found for {lcsc_part}. Skipping.")
+            continue
+        part_number = f"{mfr_part}"
+        processed_part_numbers.append(part_number)
+        update_footprint_property(component_dir, args.lib_dir, part_number)
+        process_generated_files(component_dir, args.lib_dir, mfr_part)
+        update_kicad_lib_table(args.fp_lib_table, args.lib_dir, processed_part_numbers, 'fp')
+        update_kicad_lib_table(args.sym_lib_table, args.lib_dir, processed_part_numbers, 'sym')
+    remove_temp_and_pycache(args.temp_dir)
+    print("KiCad library generation completed successfully.")
+
+
+
+if __name__ == '__main__':
+    main()
