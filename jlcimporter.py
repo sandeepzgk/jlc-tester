@@ -80,6 +80,38 @@ def update_footprint_property(component_dir, lib_dir, part_number):
         with open(sym_file_path, 'w') as f:
             f.write(updated_content)
 
+# Update the "Model" property in the footprint kicad_mod file
+def update_model_property_in_footprint(lib_dir, part_number):
+    component_dir = os.path.join(lib_dir, part_number)
+    kicad_mod_filename = next((f for f in os.listdir(component_dir) if f.endswith('.kicad_mod')), None)
+    if not kicad_mod_filename:
+        print(f"No .kicad_mod file found in {component_dir}.")
+        return
+    kicad_mod_file_path = os.path.join(component_dir, kicad_mod_filename)
+    # Ensure that lib_dir format is correct for path concatenation
+    normalized_lib_dir = lib_dir.strip("/").replace("\\", "/")
+    new_model_path = f"${{KIPRJMOD}}/{normalized_lib_dir}/{part_number}/model.step"
+    
+    updated = False
+    with open(kicad_mod_file_path, 'r') as file:
+        lines = file.readlines()
+    with open(kicad_mod_file_path, 'w') as file:
+        for line in lines:
+            if line.strip().startswith('(model'):
+                # Find the end of the model path, assuming it ends before the first newline or space after "(model"
+                end_of_path = line.find(')')  # Assuming the path does not contain ")"
+                if end_of_path == -1:  # In case ")" is not found, which is unlikely
+                    end_of_path = len(line)
+                # Reconstruct the line with the new model path
+                line = '(model ' + f'"{new_model_path}"' + line[end_of_path:] + '\n'
+                updated = True
+            file.write(line)
+    
+    if updated:
+        print(f"Updated model property in {kicad_mod_filename} to {new_model_path}")
+    else:
+        print(f"No model property found to update in {kicad_mod_filename}.")         
+
 # Process generated files
 def process_generated_files(component_dir, lib_dir, part_number):
     for dirpath, dirnames, filenames in os.walk(component_dir):
@@ -151,7 +183,6 @@ def remove_temp_and_pycache(temp_dir):
         except Exception as e:
             logging.error(f"Error removing directory {directory}: {str(e)}")
 
-
 # Main function
 def main():
     setup_logging()
@@ -172,8 +203,10 @@ def main():
             continue
         part_number = f"{mfr_part}"
         processed_part_numbers.append(part_number)
-        update_footprint_property(component_dir, args.lib_dir, part_number)
+        ## 2. Update the "Footprint" property in the symbol kicad_sym file
+        ## 3. Update the HEADER section of the model step file so that it reflects the changes we have made so far (optional)
         process_generated_files(component_dir, args.lib_dir, mfr_part)
+        update_model_property_in_footprint(args.lib_dir, mfr_part)
         update_kicad_lib_table(args.fp_lib_table, args.lib_dir, processed_part_numbers, 'fp')
         update_kicad_lib_table(args.sym_lib_table, args.lib_dir, processed_part_numbers, 'sym')
     remove_temp_and_pycache(args.temp_dir)
