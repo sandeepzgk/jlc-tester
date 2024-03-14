@@ -1,0 +1,20 @@
+2024-03-14 08:28:59,013 - INFO - Created directory: lib
+2024-03-14 08:28:59,013 - INFO - Created directory: temp
+2024-03-14 08:28:59,013 - INFO - Processing LCSC part number: C2904912
+2024-03-14 08:29:01,572 - INFO - Executed JLC2KiCadLib tool for C2904912
+2024-03-14 08:29:01,573 - INFO - Moved MS-22D17-G2.kicad_sym from temp/C2904912/symbol to lib/MS-22D17-G2
+2024-03-14 08:29:01,573 - INFO - Moved SW-SMD_DEALON_MS-22D17-G2.kicad_mod from temp/C2904912/footprint to lib/MS-22D17-G2/MS-22D17-G2.pretty
+2024-03-14 08:29:01,573 - INFO - Moved SW-SMD_DEALON_MS-22D17-G2.step from temp/C2904912/footprint/packages3d to lib/MS-22D17-G2
+2024-03-14 08:29:01,574 - WARNING - fp-lib-table not found, will create a new one.
+2024-03-14 08:29:01,574 - INFO - Updated fp-lib-table with new entries for fp library.
+2024-03-14 08:29:01,575 - WARNING - sym-lib-table not found, will create a new one.
+2024-03-14 08:29:01,575 - INFO - Updated sym-lib-table with new entries for sym library.
+2024-03-14 08:29:01,575 - INFO - Processing LCSC part number: C2939725
+2024-03-14 08:29:03,419 - INFO - Executed JLC2KiCadLib tool for C2939725
+2024-03-14 08:29:03,419 - INFO - Moved SS12D07VG3_087.kicad_sym from temp/C2939725/symbol to lib/SS12D07VG3_087
+2024-03-14 08:29:03,419 - INFO - Moved SW-TH_SS12D07VG4.kicad_mod from temp/C2939725/footprint to lib/SS12D07VG3_087/SS12D07VG3_087.pretty
+2024-03-14 08:29:03,419 - INFO - Moved SW-TH_SS12D07VG4.step from temp/C2939725/footprint/packages3d to lib/SS12D07VG3_087
+2024-03-14 08:29:03,419 - INFO - Updated fp-lib-table with new entries for fp library.
+2024-03-14 08:29:03,419 - INFO - Updated sym-lib-table with new entries for sym library.
+2024-03-14 08:29:03,420 - INFO - Removed directory: temp
+2024-03-14 08:29:03,420 - WARNING - Directory __pycache__ not found, nothing to remove.

@@ -1,0 +1,5 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "MS-22D17-G2")(type "KiCad")(uri "${KIPRJMOD}/lib/MS-22D17-G2/MS-22D17-G2.pretty")(options "")(descr ""))
+  (lib (name "SS12D07VG3_087")(type "KiCad")(uri "${KIPRJMOD}/lib/SS12D07VG3_087/SS12D07VG3_087.pretty")(options "")(descr ""))
+)
