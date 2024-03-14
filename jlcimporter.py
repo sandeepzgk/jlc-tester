@@ -67,18 +67,35 @@ def extract_mfr_part_number(component_dir):
            mfr_part = filename.split('.')[0]
     return mfr_part
 
-# Update the "Footprint" property in the .kicad_sym file
-def update_footprint_property(component_dir, lib_dir, part_number):
-    sym_filename = next((filename for filename in os.listdir(component_dir) if filename.endswith('.kicad_sym')), None)
-    if sym_filename:
-        sym_file_path = os.path.join(component_dir, sym_filename)
-        with open(sym_file_path, 'r') as f:
-            content = f.read()
-        
-        updated_content = re.sub(r'\(property "Footprint" ".*?"\)', f'(property "Footprint" "{lib_dir}/{part_number}/{part_number}_footprint.kicad_mod")', content)
-        
-        with open(sym_file_path, 'w') as f:
-            f.write(updated_content)
+#Update the "Footprint" property in the symbol kicad_sym file
+def update_footprint_property_in_symbol(lib_dir, part_number, mfr_part):
+    component_dir = os.path.join(lib_dir, part_number)
+    kicad_sym_filename = next((f for f in os.listdir(component_dir) if f.endswith('.kicad_sym')), None)
+    if not kicad_sym_filename:
+        print(f"No .kicad_sym file found in {component_dir}.")
+        return
+    kicad_sym_file_path = os.path.join(component_dir, kicad_sym_filename)
+    new_footprint_value = f"{mfr_part}:footprint"
+    try:
+        with open(kicad_sym_file_path, 'r') as file:
+            lines = file.readlines()
+        updated_lines = []
+        property_found = False
+        for line in lines:
+            if '(property "Footprint"' in line:
+                property_found = True
+                updated_lines.append(line.split('"')[0] + f'"Footprint" "{new_footprint_value}"' + line.split('"')[-1])
+                continue
+            if property_found:
+                if 'effects' in line or line.strip().startswith(')'):
+                    property_found = False
+                continue
+            updated_lines.append(line)
+        with open(kicad_sym_file_path, 'w') as file:
+            file.writelines(updated_lines)
+        print(f"Updated Footprint property in {kicad_sym_filename} to {new_footprint_value}")
+    except Exception as e:
+        print(f"An error occurred while updating the Footprint property: {e}")
 
 # Update the "Model" property in the footprint kicad_mod file
 def update_model_property_in_footprint(lib_dir, part_number):
@@ -203,10 +220,10 @@ def main():
             continue
         part_number = f"{mfr_part}"
         processed_part_numbers.append(part_number)
-        ## 2. Update the "Footprint" property in the symbol kicad_sym file
         ## 3. Update the HEADER section of the model step file so that it reflects the changes we have made so far (optional)
         process_generated_files(component_dir, args.lib_dir, mfr_part)
         update_model_property_in_footprint(args.lib_dir, mfr_part)
+        update_footprint_property_in_symbol(args.lib_dir, part_number, mfr_part)
         update_kicad_lib_table(args.fp_lib_table, args.lib_dir, processed_part_numbers, 'fp')
         update_kicad_lib_table(args.sym_lib_table, args.lib_dir, processed_part_numbers, 'sym')
     remove_temp_and_pycache(args.temp_dir)
