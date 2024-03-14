@@ -75,7 +75,7 @@ def update_footprint_property_in_symbol(lib_dir, part_number, mfr_part):
         print(f"No .kicad_sym file found in {component_dir}.")
         return
     kicad_sym_file_path = os.path.join(component_dir, kicad_sym_filename)
-    new_footprint_value = f"{mfr_part}:{mfr_part}"
+    new_footprint_value = f"{mfr_part}:footprint"
     try:
         with open(kicad_sym_file_path, 'r') as file:
             lines = file.readlines()
