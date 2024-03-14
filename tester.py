@@ -19,20 +19,21 @@ def main():
         if not run_jlc2kicadlib(lcsc_part, component_dir):
             continue
         
-        mfr_part = extract_mfr_part_number(component_dir)
+        mfr_part = extract_mfr_part_number(component_dir+'/symbol')
         if mfr_part is None:
             logging.warning(f"Manufacturer part number not found for {lcsc_part}. Skipping.")
             continue
         
-        part_number = f"{lcsc_part}-{mfr_part}"
+        part_number = f"{mfr_part}"
+        
         processed_part_numbers.append(part_number)
         
         update_footprint_property(component_dir, args.lib_dir, part_number)
-        process_generated_files(component_dir, args.lib_dir, part_number)
+        process_generated_files(component_dir, args.lib_dir, mfr_part)
     
     update_fp_lib_table(args.fp_lib_table, args.lib_dir, processed_part_numbers)
     update_sym_lib_table(args.sym_lib_table, args.lib_dir, processed_part_numbers)
-    
+    remove_temp_and_pycache(args.temp_dir)
     print("KiCad library generation completed successfully.")
 
 if __name__ == '__main__':
